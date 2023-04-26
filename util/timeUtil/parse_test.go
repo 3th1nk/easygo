@@ -14,8 +14,8 @@ func TestParseOne(t *testing.T) {
 	str := "0001-01-01 00:00:00"
 	val, err := Parse(str)
 	if assert.NoError(t, err) {
-		assert.Equal(t, str, val.Format(GeneralFormatNano))
-		util.Println(val.Format(GeneralFormatNano))
+		assert.Equal(t, str, val.Format(DateTimeNano))
+		util.Println(val.Format(DateTimeNano))
 	}
 }
 
@@ -88,11 +88,11 @@ func TestParse_2(t *testing.T) {
 	} {
 		val, err := Parse(v[0])
 		if assert.NoError(t, err) {
-			assert.Equal(t, v[1], val.Format(GeneralFormat))
+			assert.Equal(t, v[1], val.Format(DateTime))
 
 			val, err = Parse(strings.ReplaceAll(v[0], "1580486400", "2020-02-01"))
 			assert.NoError(t, err)
-			assert.Equal(t, v[1], val.Format(GeneralFormat))
+			assert.Equal(t, v[1], val.Format(DateTime))
 		}
 	}
 }

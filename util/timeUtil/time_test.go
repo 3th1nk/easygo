@@ -36,7 +36,7 @@ func TestFormat(t *testing.T) {
 	t.Log(Format(time.Unix(0, 0)))
 	t.Log(Format(time.Time{}))
 	t.Log(Format(time.Unix(math.MinInt32, 0)))
-	t.Log(Format(time.Date(9999, 12, 31, 23, 59, 60, -1, time.Local), GeneralFormatNano))
+	t.Log(Format(time.Date(9999, 12, 31, 23, 59, 60, -1, time.Local), DateTimeNano))
 	t9999 := time.Date(9999, 12, 31, 23, 59, 60, -1, time.Local)
 	t.Log(t9999.Unix())
 	t.Log(time.Now().UnixNano())
@@ -97,7 +97,7 @@ func TestGeneralParse(t *testing.T) {
 	if !reflect2.IsNil(err) {
 		t.Errorf("error: %v", err)
 	} else {
-		t.Logf("%s --> %s", str, val.Format(GeneralFormatNano))
+		t.Logf("%s --> %s", str, val.Format(DateTimeNano))
 	}
 
 	for _, str := range []string{
@@ -119,7 +119,7 @@ func TestGeneralParse(t *testing.T) {
 		if !reflect2.IsNil(err) {
 			t.Errorf("error: %v", err)
 		} else {
-			t.Logf("%s --> %s", str, val.Format(GeneralFormatNano))
+			t.Logf("%s --> %s", str, val.Format(DateTimeNano))
 		}
 	}
 }
@@ -142,7 +142,7 @@ func TestLastWeekday(t *testing.T) {
 func TestBeginOfWeek(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		now := time.Now().Add(time.Duration(i) * 24 * time.Hour)
-		t.Logf("beginAtSunday:  date=%v, begin=%v, end=%v", Format(now, DateFormat), Format(BeginOfWeek(now, false)), Format(EndOfWeek(now, false)))
+		t.Logf("beginAtSunday:  date=%v, begin=%v, end=%v", Format(now, DateOnly), Format(BeginOfWeek(now, false)), Format(EndOfWeek(now, false)))
 		t.Logf(strings.Repeat(" ", 15)+"                  begin=%v, end=%v", Format(BeginOfWeek(now, true)), Format(EndOfWeek(now, true)))
 	}
 }
@@ -150,8 +150,8 @@ func TestBeginOfWeek(t *testing.T) {
 func TestRoundAndTruncate(t *testing.T) {
 	ts, _ := Parse("2022-01-01 00:00:00")
 	rd := 5 * time.Second
-	assert.Equal(t, ts.Format(GeneralFormat), ts.Add(2*time.Second).Round(5*time.Second).Format(GeneralFormat))
-	assert.Equal(t, ts.Add(rd).Format(GeneralFormat), ts.Add(3*time.Second).Round(5*time.Second).Format(GeneralFormat))
-	assert.Equal(t, ts.Format(GeneralFormat), ts.Add(2*time.Second).Truncate(5*time.Second).Format(GeneralFormat))
-	assert.Equal(t, ts.Format(GeneralFormat), ts.Add(3*time.Second).Truncate(5*time.Second).Format(GeneralFormat))
+	assert.Equal(t, ts.Format(DateTime), ts.Add(2*time.Second).Round(5*time.Second).Format(DateTime))
+	assert.Equal(t, ts.Add(rd).Format(DateTime), ts.Add(3*time.Second).Round(5*time.Second).Format(DateTime))
+	assert.Equal(t, ts.Format(DateTime), ts.Add(2*time.Second).Truncate(5*time.Second).Format(DateTime))
+	assert.Equal(t, ts.Format(DateTime), ts.Add(3*time.Second).Truncate(5*time.Second).Format(DateTime))
 }

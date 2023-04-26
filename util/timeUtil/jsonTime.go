@@ -17,7 +17,7 @@ func ToJsonTime(t time.Time) JsonTime {
 }
 
 func (this JsonTime) String() string {
-	return this.Format(GeneralFormatNano)
+	return this.Format(DateTimeNano)
 }
 
 // MarshalJSON on LocalTime format Time field with %Y-%m-%d %H:%M:%S
@@ -25,7 +25,7 @@ func (this JsonTime) MarshalJSON() ([]byte, error) {
 	if !this.After(Local2000) {
 		return []byte(`""`), nil
 	}
-	str := `"` + this.Format(GeneralFormatNano) + `"`
+	str := `"` + this.Format(DateTimeNano) + `"`
 	return []byte(str), nil
 }
 
@@ -43,7 +43,7 @@ func (this *JsonTime) UnmarshalJSON(data []byte) error {
 
 // Value insert timestamp into mysql need this function.
 func (this JsonTime) Value() (driver.Value, error) {
-	return this.Format(GeneralFormatNano), nil
+	return this.Format(DateTimeNano), nil
 }
 
 // Scan valueof time.Time

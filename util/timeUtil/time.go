@@ -12,13 +12,13 @@ const (
 	Day  = time.Hour * 24
 	Week = Day * 7
 
-	GeneralFormat     = "2006-01-02 15:04:05"
-	GeneralFormatNano = "2006-01-02 15:04:05.999999999"
-	DateFormat        = "2006-01-02"
+	DateTime     = "2006-01-02 15:04:05"
+	DateTimeNano = "2006-01-02 15:04:05.999999999"
+	DateOnly     = "2006-01-02"
 )
 
 var (
-	DefaultFormat      = GeneralFormat
+	DefaultFormat      = DateTime
 	DefaultBeginOfWeek = time.Monday
 
 	ZeroTime          = time.Unix(0, 0)
@@ -282,7 +282,7 @@ func FormatDate(t time.Time, format ...string) string {
 		realFormat = format[0]
 	}
 	if realFormat == "" {
-		realFormat = DateFormat
+		realFormat = DateOnly
 	}
 	return t.Format(realFormat)
 }
