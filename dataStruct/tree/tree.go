@@ -35,8 +35,8 @@ type NodeData struct {
 type EachOrder int
 
 const (
-	OrderPre  = EachOrder(1) // 前序遍历，先遍历根节点，然后再遍历子节点
-	OrderPost = EachOrder(2) // 后序遍历，先遍历子节点，然后再遍历根节点
+	OrderPre  EachOrder = 1 // 前序遍历，先遍历根节点，然后再遍历子节点
+	OrderPost EachOrder = 2 // 后序遍历，先遍历子节点，然后再遍历根节点
 )
 
 func (this *Tree) ensureInit() *Tree {
