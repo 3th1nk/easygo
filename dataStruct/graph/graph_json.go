@@ -33,12 +33,11 @@ type graphJsonData struct {
 }
 
 func toJsonData(graph *Graph) *graphJsonData {
-	data, idx := &graphJsonData{}, 0
+	data := &graphJsonData{}
 
-	//
-	data.Node, idx = make([]*Node, len(graph.nodeMap)), 0
+	data.Node = make([]*Node, 0, len(graph.nodeMap))
 	for _, item := range graph.nodeMap {
-		data.Node[idx], idx = item.Node, idx+1
+		data.Node = append(data.Node, item.Node)
 	}
 	sort.Slice(data.Node, func(i, j int) bool {
 		a, b := data.Node[i], data.Node[j]
@@ -48,25 +47,24 @@ func toJsonData(graph *Graph) *graphJsonData {
 		return a.Id < b.Id
 	})
 
-	//
-	data.Line, idx = make([]*Line, len(graph.lineMap)), 0
+	data.Line = make([]*Line, 0, len(graph.lineMap))
 	for _, item := range graph.lineMap {
-		data.Line[idx], idx = item.Line, idx+1
+		data.Line = append(data.Line, item.Line)
 	}
 	sort.Slice(data.Line, func(i, j int) bool {
 		a, b := data.Line[i], data.Line[j]
 		if n := strings.Compare(a.Left, b.Left); n != 0 {
 			return n < 0
-		} else if n := strings.Compare(a.Right, b.Right); n != 0 {
+		}
+		if n := strings.Compare(a.Right, b.Right); n != 0 {
 			return n < 0
 		}
 		return a.Id < b.Id
 	})
 
-	//
-	data.Combo, idx = make([]*Combo, len(graph.comboMap)), 0
+	data.Combo = make([]*Combo, 0, len(graph.comboMap))
 	for _, item := range graph.comboMap {
-		data.Combo[idx], idx = item, idx+1
+		data.Combo = append(data.Combo, item.Combo)
 	}
 	sort.Slice(data.Combo, func(i, j int) bool {
 		return data.Combo[i].Id < data.Combo[j].Id

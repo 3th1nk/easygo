@@ -137,7 +137,7 @@ func testTraversal(from, to string) (path, walked []string, lastNode map[string]
 		if ended {
 			path = append(path, str)
 		}
-		walked = append(walked, fmt.Sprintf("%v, %v", str, ended))
+		walked = append(walked, fmt.Sprintf("%v, %v", ended, str))
 		lastId := a.Node[len(a.Node)-1].Id
 		lastNode[lastId] = lastNode[lastId] + 1
 		return true
@@ -153,13 +153,6 @@ func testTraversal(from, to string) (path, walked []string, lastNode map[string]
 	return
 }
 
-//         1
-//     <--
-//   <--
-// 2      <->      3      -->      6      -->      7
-//   -->       <->   -->             <->       <->   <--
-//     -->   <->       -->             <->   <->       <--
-//         4     -->       5               8      -->      9
 func newTestGraph() *Graph {
 	g := New()
 	g.AddNode(
@@ -171,7 +164,7 @@ func newTestGraph() *Graph {
 		&Node{Id: "6", Level: 2, Type: "b", ComboId: "bbb"},
 		&Node{Id: "7", Level: 2, Type: "b", ComboId: "bbb"},
 		&Node{Id: "8", Level: 3, Type: "b", ComboId: "bbb"},
-		&Node{Id: "9", Level: 3, Type: "b", ComboId: "bbb"},
+		&Node{Id: "9", Level: 3, Type: "b", ComboId: "ccc"},
 	)
 	g.AddLine(
 		&Line{Left: "1", Right: "2", Direction: LeftToRight},
@@ -190,6 +183,10 @@ func newTestGraph() *Graph {
 	g.AddCombo(
 		&Combo{Id: "aaa", Type: "a"},
 		&Combo{Id: "bbb", Type: "b"},
+		&Combo{Id: "ccc", Type: "b", ComboId: "aaa"},
 	)
+	if err := g.Update(); err != nil {
+		panic(err)
+	}
 	return g
 }
