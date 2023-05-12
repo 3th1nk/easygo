@@ -6,6 +6,7 @@ type Logger interface {
 	GetLevel() int
 	SetLevel(level int)
 
+	Fatal(format string, a ...interface{})
 	Error(format string, a ...interface{})
 	Warn(format string, a ...interface{})
 	Info(format string, a ...interface{})
