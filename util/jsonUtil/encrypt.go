@@ -12,7 +12,11 @@ import (
 func RegisterEncryptField(typ string, encryptKey string, encryptField ...string) {
 	for _, s := range encryptField {
 		jsonIter.RegisterFieldEncoderFunc(typ, s, func(ptr unsafe.Pointer, stream *jsonIter.Stream) {
-			stream.WriteString(aes.Encrypt(*(*string)(ptr), encryptKey, true))
+			str, err := aes.Encrypt(*(*string)(ptr), encryptKey, true)
+			if err != nil {
+				panic(err)
+			}
+			stream.WriteString(str)
 		}, func(ptr unsafe.Pointer) bool {
 			return *(*string)(ptr) == ""
 		})

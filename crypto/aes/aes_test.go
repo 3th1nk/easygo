@@ -17,16 +17,19 @@ func TestEncryptAndDecrypt(t *testing.T) {
 	util.Println("str: %v", str)
 
 	// 加密结果与 V1 相同，只是多了个前缀
-	str2_0 := Encrypt(str, key)
+	str2_0, err := Encrypt(str, key)
+	assert.NoError(t, err)
 	assert.True(t, strings.HasPrefix(str2_0, EncryptPrefix))
 	util.Println("加密 1: %v", str2_0)
 
 	// 已加密的字符串不会重复加密
-	str2_1 := Encrypt(str2_0, key)
+	str2_1, err := Encrypt(str2_0, key)
+	assert.NoError(t, err)
 	assert.Equal(t, str2_0, str2_1)
 
 	// 如果强制加密，还是可以加密的
-	str2_2 := Encrypt(str2_1, key, true)
+	str2_2, err := Encrypt(str2_1, key, true)
+	assert.NoError(t, err)
 	assert.NotEqual(t, str2_1, str2_2)
 	util.Println("加密 2: %v", str2_2)
 

@@ -18,16 +18,16 @@ var (
 //  加密后，会在密文前面追加一个字符串用来标记这是一个加密字符串。
 //  加密前，可以根据这个标记判断这是否已经是一个密文，从而决定还要不要继续加密。
 // 	鉴于有可能会存在部分场景确实需要对密文进行二次加密，故增加 force 参数用来指定强制加密。
-func Encrypt(plainText, key string, force ...bool) string {
+func Encrypt(plainText, key string, force ...bool) (string, error) {
 	if n := len(key); n != 16 && n != 24 && n != 32 {
 		// aes.NewCipher 产生错误只有一个原因：密钥长度不是 16|24|32。
 		// 密钥应当是在系统设计阶段就协商确定的，必须符合该要求。故出现错误说明存在严重的设计缺陷，应当立即以最严重的方式暴露、以便尽快修改。
-		panic(ErrInvalidKey)
+		return plainText, ErrInvalidKey
 	}
 
 	if strings.HasPrefix(plainText, EncryptPrefix) && (len(force) == 0 || !force[0]) {
 		// 已经加密过、且不强制加密，直接返回。
-		return plainText
+		return plainText, nil
 	}
 
 	keyBytes := []byte(key)
@@ -40,7 +40,7 @@ func Encrypt(plainText, key string, force ...bool) string {
 	encryptBytes := paddingPKCS7(data, blockSize)
 	data = make([]byte, len(encryptBytes))
 	blockMode.CryptBlocks(data, encryptBytes)
-	return EncryptPrefix + base64.StdEncoding.EncodeToString(data)
+	return EncryptPrefix + base64.StdEncoding.EncodeToString(data), nil
 }
 
 // Decrypt 字符串解密
@@ -57,7 +57,7 @@ func Decrypt(cipherText string, key string, force ...bool) (result string, err e
 	if n := len(key); n != 16 && n != 24 && n != 32 {
 		// aes.NewCipher 产生错误只有一个原因：密钥长度不是 16|24|32。
 		// 密钥应当是在系统设计阶段就协商确定的，必须符合该要求。故出现错误说明存在严重的设计缺陷，应当立即以最严重的方式暴露、以便尽快修改。
-		panic(ErrInvalidKey)
+		return "", ErrInvalidKey
 	}
 
 	if strings.HasPrefix(cipherText, EncryptPrefix) {
