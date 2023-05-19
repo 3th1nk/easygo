@@ -2,16 +2,21 @@ package charset
 
 import (
 	"github.com/stretchr/testify/assert"
-	"strings"
+	"golang.org/x/text/encoding/simplifiedchinese"
 	"testing"
 )
 
 func TestToUTF8(t *testing.T) {
-	var builder strings.Builder
-	for _, r := range []rune{0x5e, 0x2d, 0x2d, 0x2d, 0x2d, 0x2d, 0x65e0, 0x6cd5, 0x8bc6, 0x522b, 0x7684, 0x5173, 0x952e, 0x5b57, 0x3a} {
-		builder.WriteRune(r)
-	}
-	s := builder.String()
-	t.Log(s)
-	assert.Equal(t, "^-----无法识别的关键字:", ToUTF8(s))
+	s := "abc123中文繁體"
+	s2, err := simplifiedchinese.GB18030.NewEncoder().String(s)
+	assert.NoError(t, err)
+	s3, err := simplifiedchinese.GB18030.NewDecoder().String(s2)
+	assert.NoError(t, err)
+
+	assert.Equal(t, true, IsGB18030(s2))
+	assert.Equal(t, s, ToUTF8(s2))
+	assert.Equal(t, s, s3)
+
+	s = "abc123\xff中文繁體"
+	assert.Equal(t, false, IsUTF8(s))
 }
