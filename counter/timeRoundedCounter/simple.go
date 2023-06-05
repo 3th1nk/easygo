@@ -42,7 +42,7 @@ type simpleCountItem struct {
 }
 
 func (this *simpleCountItem) IsZero() bool {
-	return this.cnt != 0
+	return this.cnt == 0
 }
 
 func (this *simpleCountItem) Reset() {
