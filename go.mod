@@ -16,6 +16,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/panjf2000/ants/v2 v2.8.1
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.8.2
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
