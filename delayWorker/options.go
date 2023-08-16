@@ -10,6 +10,10 @@ type Options struct {
 	DelayCnt  int
 	Parallel  bool
 	Logger    logs.Logger
+
+	// 调试模式
+	debug   bool
+	counter *counter
 }
 
 func DefaultOptions() *Options {
@@ -37,7 +41,44 @@ func (opt *Options) ensure() {
 	}
 }
 
-type Option func() *Worker
+func (opt *Options) statistics() string {
+	if opt.debug && opt.counter != nil {
+		return opt.counter.String()
+	}
+	return ""
+}
+
+func (opt *Options) incReceive(n int) {
+	if opt.debug {
+		if opt.counter == nil {
+			opt.counter = &counter{}
+		}
+		opt.counter.IncReceive(n)
+	}
+}
+
+func (opt *Options) incDrop(n int) {
+	if opt.debug {
+		if opt.counter == nil {
+			opt.counter = &counter{}
+		}
+		opt.counter.IncDrop(n)
+	}
+}
+
+func (opt *Options) incDone(n int) {
+	if opt.debug {
+		if opt.counter == nil {
+			opt.counter = &counter{}
+		}
+		opt.counter.IncDone(n)
+	}
+}
+
+func (this *Worker) Debug() *Worker {
+	this.opt.debug = true
+	return this
+}
 
 func (this *Worker) WithDelaySec(sec int) *Worker {
 	this.opt.DelaySec = sec

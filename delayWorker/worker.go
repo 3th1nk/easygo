@@ -108,11 +108,6 @@ func (this *Worker) State() int32 {
 }
 
 func (this *Worker) Stop() {
-	if atomic.CompareAndSwapInt32(&this.state, StateCreated, StateStopped) {
-		this.opt.Logger.Debug("delayWorker[%s] is stopped", this.name)
-		return
-	}
-
 	if atomic.CompareAndSwapInt32(&this.state, StateRunning, StateStopping) {
 		this.opt.Logger.Debug("delayWorker[%s] is stopping", this.name)
 
@@ -122,16 +117,24 @@ func (this *Worker) Stop() {
 			this.opt.Logger.Debug("delayWorker[%s] is waiting stopped, current state is:%s", this.name, StateString(atomic.LoadInt32(&this.state)))
 			time.Sleep(time.Millisecond * 100)
 		}
+	} else if atomic.CompareAndSwapInt32(&this.state, StateCreated, StateStopped) {
+		// do nothing
+	}
+
+	if s := this.opt.statistics(); s != "" {
+		this.opt.Logger.Debug("delayWorker[%s] is stopped, %s", this.name, s)
+	} else {
 		this.opt.Logger.Debug("delayWorker[%s] is stopped", this.name)
-		return
 	}
 }
 
 func (this *Worker) Push(job interface{}) {
 	if atomic.LoadInt32(&this.state) == StateRunning {
 		this.receive <- job
+		this.opt.incReceive(1)
 	} else {
 		this.opt.Logger.Warn("delayWorker[%s] is not running, job is dropped", this.name)
+		this.opt.incDrop(1)
 	}
 }
 
@@ -146,6 +149,7 @@ func (this *Worker) do() {
 			this.opt.Logger.Error("delayWorker[%s] do panic:%s", this.name, r)
 		}
 		this.opt.Logger.Debug("delayWorker[%s] do %d jobs, cost:%s", this.name, len(this.buf), time.Since(st))
+		this.opt.incDone(len(this.buf))
 		// !!!clear buf even if panic occurred
 		this.buf = this.buf[:0]
 	}()
@@ -164,7 +168,7 @@ func (this *Worker) do() {
 func (this *Worker) Run() {
 	if !atomic.CompareAndSwapInt32(&this.state, StateCreated, StateRunning) &&
 		!atomic.CompareAndSwapInt32(&this.state, StateStopped, StateRunning) {
-		this.opt.Logger.Error("delayWorker[%s] is in state %s, cannot be started", this.name, StateString(this.state))
+		this.opt.Logger.Error("delayWorker[%s] is in state %s, cannot be started", this.name, StateString(atomic.LoadInt32(&this.state)))
 		return
 	}
 
@@ -187,12 +191,7 @@ func (this *Worker) Run() {
 			processing := true
 			for processing {
 				select {
-				case job, ok := <-this.receive:
-					if !ok {
-						this.do()
-						processing = false
-						break
-					}
+				case job := <-this.receive:
 					this.buf = append(this.buf, job)
 					if len(this.buf) >= this.opt.DelayCnt {
 						this.do()
@@ -221,11 +220,7 @@ func (this *Worker) Run() {
 				this.opt.Logger.Debug("delayWorker[%s] ticker", this.name)
 				this.do()
 
-			case job, ok := <-this.receive:
-				if !ok {
-					break
-				}
-
+			case job := <-this.receive:
 				this.buf = append(this.buf, job)
 				if len(this.buf) >= this.opt.DelayCnt {
 					this.opt.Logger.Debug("delayWorker[%s] buf is full", this.name)

@@ -38,7 +38,7 @@ func TestParallelWorker(t *testing.T) {
 	w := New("test", handler)
 	defer w.Stop()
 
-	w.WithQueueSize(50).WithDelaySec(2).WithDelayCnt(10).WithParallel(true).Run()
+	w.WithQueueSize(50).WithDelaySec(2).WithDelayCnt(10).WithParallel(true).Debug().Run()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
