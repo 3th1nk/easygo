@@ -183,12 +183,13 @@ func (this *Worker) Run() {
 			}
 			ticker.Stop()
 
-			// processed all jobs when exit
+			// processed all jobs in receive and buf before exit
 			processing := true
 			for processing {
 				select {
 				case job, ok := <-this.receive:
 					if !ok {
+						this.do()
 						processing = false
 						break
 					}
