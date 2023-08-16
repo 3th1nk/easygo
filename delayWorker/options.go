@@ -12,6 +12,16 @@ type Options struct {
 	Logger    logs.Logger
 }
 
+func DefaultOptions() *Options {
+	return &Options{
+		QueueSize: 1000,
+		DelaySec:  5,
+		DelayCnt:  100,
+		Parallel:  false,
+		Logger:    logs.Default,
+	}
+}
+
 func (opt *Options) ensure() {
 	if opt.DelaySec <= 0 {
 		opt.DelaySec = 5

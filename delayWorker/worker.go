@@ -4,23 +4,45 @@ import (
 	"github.com/3th1nk/easygo/util/strUtil"
 	"github.com/panjf2000/ants/v2"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"time"
 )
 
-type Worker struct {
-	name    string
-	receive chan interface{}
-	buf     []interface{}
-	handler func(jobs []interface{})
-	running int32
-	mu      sync.Mutex
-	pool    *ants.Pool
-	opt     *Options
+const (
+	StateCreated int32 = iota
+	StateRunning
+	StateStopping
+	StateStopped
+)
+
+func StateString(state int32) string {
+	switch state {
+	case StateCreated:
+		return "created"
+	case StateRunning:
+		return "running"
+	case StateStopping:
+		return "stopping"
+	case StateStopped:
+		return "stopped"
+	default:
+		return "unknown"
+	}
 }
 
-func New(name string, handler func(jobs []interface{})) *Worker {
+type Worker struct {
+	name    string                   // 名称
+	receive chan interface{}         // 接收通道
+	buf     []interface{}            // 缓冲区
+	handler func(jobs []interface{}) // 处理函数
+	stop    chan bool                // 停止信号
+	inited  bool                     // 是否已经初始化
+	state   int32                    // 状态
+	pool    *ants.Pool               // 执行协程池
+	opt     *Options                 // 可选配置
+}
+
+func New(name string, handler func(jobs []interface{}), opts ...*Options) *Worker {
 	if handler == nil {
 		panic("handler is nil")
 	}
@@ -28,21 +50,36 @@ func New(name string, handler func(jobs []interface{})) *Worker {
 		name = strUtil.Rand(6)
 	}
 
+	var opt *Options
+	if len(opts) > 0 && opts[0] != nil {
+		opt = opts[0]
+	} else {
+		opt = DefaultOptions()
+	}
+
 	return &Worker{
 		name:    name,
 		handler: handler,
-		opt:     &Options{},
+		stop:    make(chan bool, 1),
+		inited:  false,
+		state:   StateCreated,
+		opt:     opt,
 	}
 }
 
 func (this *Worker) init() error {
-	this.opt.ensure()
+	if this.inited {
+		return nil
+	}
+	this.inited = true
 
+	this.opt.ensure()
 	if this.opt.Parallel {
 		if runtime.NumCPU() > 1 {
 			var err error
 			this.pool, err = ants.NewPool(runtime.NumCPU())
 			if err != nil {
+				this.inited = false
 				return err
 			}
 		} else {
@@ -56,37 +93,42 @@ func (this *Worker) init() error {
 	return nil
 }
 
-func (this *Worker) Close() {
-	if this.Running() {
-		this.setRunning(0)
-		this.opt.Logger.Debug("delayWorker[%s] close", this.name)
-
-		this.do()
-		for job := range this.receive {
-			this.buf = append(this.buf, job)
-			if len(this.buf) >= this.opt.DelayCnt {
-				this.do()
-			}
-		}
-		this.do()
-
+func (this *Worker) release() {
+	if this.inited {
 		close(this.receive)
 		if this.pool != nil {
 			this.pool.Release()
 		}
+		this.inited = false
 	}
 }
 
-func (this *Worker) Running() bool {
-	return atomic.LoadInt32(&this.running) > 0
+func (this *Worker) State() int32 {
+	return atomic.LoadInt32(&this.state)
 }
 
-func (this *Worker) setRunning(val int) {
-	atomic.AddInt32(&this.running, int32(val))
+func (this *Worker) Stop() {
+	if atomic.CompareAndSwapInt32(&this.state, StateCreated, StateStopped) {
+		this.opt.Logger.Debug("delayWorker[%s] is stopped", this.name)
+		return
+	}
+
+	if atomic.CompareAndSwapInt32(&this.state, StateRunning, StateStopping) {
+		this.opt.Logger.Debug("delayWorker[%s] is stopping", this.name)
+
+		// wait for all jobs to be processed
+		this.stop <- true
+		for atomic.LoadInt32(&this.state) == StateStopping {
+			this.opt.Logger.Debug("delayWorker[%s] is waiting stopped, current state is:%s", this.name, StateString(atomic.LoadInt32(&this.state)))
+			time.Sleep(time.Millisecond * 100)
+		}
+		this.opt.Logger.Debug("delayWorker[%s] is stopped", this.name)
+		return
+	}
 }
 
 func (this *Worker) Push(job interface{}) {
-	if this.Running() {
+	if atomic.LoadInt32(&this.state) == StateRunning {
 		this.receive <- job
 	} else {
 		this.opt.Logger.Warn("delayWorker[%s] is not running, job is dropped", this.name)
@@ -97,70 +139,98 @@ func (this *Worker) do() {
 	if len(this.buf) == 0 {
 		return
 	}
-	this.mu.Lock()
-	if len(this.buf) == 0 {
-		this.mu.Unlock()
-		return
-	}
-	this.opt.Logger.Debug("delayWorker[%s] do %d jobs", this.name, len(this.buf))
+
+	st := time.Now()
+	defer func() {
+		if r := recover(); r != nil {
+			this.opt.Logger.Error("delayWorker[%s] do panic:%s", this.name, r)
+		}
+		this.opt.Logger.Debug("delayWorker[%s] do %d jobs, cost:%s", this.name, len(this.buf), time.Since(st))
+		// !!!clear buf even if panic occurred
+		this.buf = this.buf[:0]
+	}()
 
 	if this.opt.Parallel {
 		copyBuf := make([]interface{}, len(this.buf))
 		copy(copyBuf, this.buf)
-		this.buf = this.buf[:0]
-		this.mu.Unlock()
 		_ = this.pool.Submit(func() {
 			this.handler(copyBuf)
 		})
 	} else {
 		this.handler(this.buf)
-		this.buf = this.buf[:0]
-		this.mu.Unlock()
 	}
 }
 
-func (this *Worker) Run() error {
-	if this.Running() {
-		return nil
+func (this *Worker) Run() {
+	if !atomic.CompareAndSwapInt32(&this.state, StateCreated, StateRunning) &&
+		!atomic.CompareAndSwapInt32(&this.state, StateStopped, StateRunning) {
+		this.opt.Logger.Error("delayWorker[%s] is in state %s, cannot be started", this.name, StateString(this.state))
+		return
 	}
+
 	if err := this.init(); err != nil {
-		return err
+		this.opt.Logger.Error("delayWorker[%s] init error:%s", this.name, err)
+		atomic.StoreInt32(&this.state, StateStopped)
+		return
 	}
-	this.setRunning(1)
+	this.opt.Logger.Debug("delayWorker[%s] is running", this.name)
 
 	go func() {
+		var ticker = time.NewTicker(time.Second * time.Duration(this.opt.DelaySec))
 		defer func() {
 			if r := recover(); r != nil {
 				this.opt.Logger.Fatal("delayWorker[%s] panic:%s", this.name, r)
 			}
-			this.setRunning(0)
+			ticker.Stop()
+
+			// processed all jobs when exit
+			processing := true
+			for processing {
+				select {
+				case job, ok := <-this.receive:
+					if !ok {
+						processing = false
+						break
+					}
+					this.buf = append(this.buf, job)
+					if len(this.buf) >= this.opt.DelayCnt {
+						this.do()
+					}
+
+				default:
+					this.do()
+					processing = false
+					break
+				}
+			}
+
+			// release resources
+			this.release()
+
+			atomic.StoreInt32(&this.state, StateStopped)
 		}()
 
-		var timer *time.Timer
-		for this.Running() {
-			job, ok := <-this.receive
-			if !ok {
-				break
-			}
+		for {
+			select {
+			case <-this.stop:
+				this.opt.Logger.Debug("delayWorker[%s] receive stop signal", this.name)
+				return
 
-			if len(this.buf) == 0 {
-				timer = time.AfterFunc(time.Second*time.Duration(this.opt.DelaySec), func() {
-					this.opt.Logger.Debug("delayWorker[%s] timer", this.name)
-					this.do()
-				})
-			}
-
-			this.mu.Lock()
-			this.buf = append(this.buf, job)
-			this.mu.Unlock()
-
-			if len(this.buf) >= this.opt.DelayCnt {
-				timer.Stop()
-				this.opt.Logger.Debug("delayWorker[%s] buf is full", this.name)
+			case <-ticker.C:
+				this.opt.Logger.Debug("delayWorker[%s] ticker", this.name)
 				this.do()
+
+			case job, ok := <-this.receive:
+				if !ok {
+					break
+				}
+
+				this.buf = append(this.buf, job)
+				if len(this.buf) >= this.opt.DelayCnt {
+					this.opt.Logger.Debug("delayWorker[%s] buf is full", this.name)
+					this.do()
+				}
 			}
 		}
 	}()
-
-	return nil
 }
