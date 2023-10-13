@@ -2,12 +2,13 @@ package delayWorker
 
 import (
 	"github.com/3th1nk/easygo/util/logs"
+	"time"
 )
 
 type Options struct {
 	QueueSize int
-	DelaySec  int
-	DelayCnt  int
+	DelaySize int
+	DelayTime time.Duration
 	Parallel  bool
 	Logger    logs.Logger
 
@@ -19,19 +20,19 @@ type Options struct {
 func DefaultOptions() *Options {
 	return &Options{
 		QueueSize: 1000,
-		DelaySec:  5,
-		DelayCnt:  100,
+		DelaySize: 100,
+		DelayTime: 5 * time.Second,
 		Parallel:  false,
 		Logger:    logs.Default,
 	}
 }
 
 func (opt *Options) ensure() {
-	if opt.DelaySec <= 0 {
-		opt.DelaySec = 5
+	if opt.DelayTime <= 0 {
+		opt.DelayTime = 5 * time.Second
 	}
-	if opt.DelayCnt <= 0 {
-		opt.DelayCnt = 100
+	if opt.DelaySize <= 0 {
+		opt.DelaySize = 100
 	}
 	if opt.QueueSize <= 0 {
 		opt.QueueSize = 1000
@@ -80,13 +81,13 @@ func (this *Worker) Debug() *Worker {
 	return this
 }
 
-func (this *Worker) WithDelaySec(sec int) *Worker {
-	this.opt.DelaySec = sec
+func (this *Worker) WithDelaySize(size int) *Worker {
+	this.opt.DelaySize = size
 	return this
 }
 
-func (this *Worker) WithDelayCnt(cnt int) *Worker {
-	this.opt.DelayCnt = cnt
+func (this *Worker) WithDelayTime(d time.Duration) *Worker {
+	this.opt.DelayTime = d
 	return this
 }
 

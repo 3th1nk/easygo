@@ -89,7 +89,7 @@ func (this *Worker) init() error {
 	}
 
 	this.receive = make(chan interface{}, this.opt.QueueSize)
-	this.buf = make([]interface{}, 0, this.opt.DelayCnt)
+	this.buf = make([]interface{}, 0, this.opt.DelaySize)
 	return nil
 }
 
@@ -180,7 +180,7 @@ func (this *Worker) Run() {
 	this.opt.Logger.Debug("delayWorker[%s] is running", this.name)
 
 	go func() {
-		var ticker = time.NewTicker(time.Second * time.Duration(this.opt.DelaySec))
+		var ticker = time.NewTicker(this.opt.DelayTime)
 		defer func() {
 			if r := recover(); r != nil {
 				this.opt.Logger.Fatal("delayWorker[%s] panic:%s", this.name, r)
@@ -193,7 +193,7 @@ func (this *Worker) Run() {
 				select {
 				case job := <-this.receive:
 					this.buf = append(this.buf, job)
-					if len(this.buf) >= this.opt.DelayCnt {
+					if len(this.buf) >= this.opt.DelaySize {
 						this.do()
 					}
 
@@ -222,7 +222,7 @@ func (this *Worker) Run() {
 
 			case job := <-this.receive:
 				this.buf = append(this.buf, job)
-				if len(this.buf) >= this.opt.DelayCnt {
+				if len(this.buf) >= this.opt.DelaySize {
 					this.opt.Logger.Debug("delayWorker[%s] buf is full", this.name)
 					this.do()
 				}
