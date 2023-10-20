@@ -143,12 +143,12 @@ func (this *Worker) do() {
 		return
 	}
 
-	st := time.Now()
+	//st := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
 			this.opt.Logger.Error("delayWorker[%s] do panic:%s", this.name, r)
 		}
-		this.opt.Logger.Debug("delayWorker[%s] do %d jobs, cost:%s", this.name, len(this.buf), time.Since(st))
+		//this.opt.Logger.Debug("delayWorker[%s] do %d jobs, cost:%s", this.name, len(this.buf), time.Since(st))
 		this.opt.incDone(len(this.buf))
 		// !!!clear buf even if panic occurred
 		this.buf = this.buf[:0]
@@ -217,13 +217,13 @@ func (this *Worker) Run() {
 				return
 
 			case <-ticker.C:
-				this.opt.Logger.Debug("delayWorker[%s] ticker", this.name)
+				//this.opt.Logger.Debug("delayWorker[%s] ticker", this.name)
 				this.do()
 
 			case job := <-this.receive:
 				this.buf = append(this.buf, job)
 				if len(this.buf) >= this.opt.DelaySize {
-					this.opt.Logger.Debug("delayWorker[%s] buf is full", this.name)
+					//this.opt.Logger.Debug("delayWorker[%s] buf is full", this.name)
 					this.do()
 				}
 			}
