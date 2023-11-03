@@ -95,6 +95,9 @@ func IsUTF8NotStrict(s string) bool {
 }
 
 func ToUTF8(s string) string {
+	if IsUTF8(s) {
+		return s
+	}
 	if IsGB18030(s) {
 		s1, err := simplifiedchinese.GB18030.NewDecoder().String(s)
 		if err == nil {

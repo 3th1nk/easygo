@@ -19,4 +19,9 @@ func TestToUTF8(t *testing.T) {
 
 	s = "abc123\xff中文繁體"
 	assert.Equal(t, false, IsUTF8(s))
+
+	s = "电信"
+	assert.Equal(t, true, IsUTF8(s))
+	assert.Equal(t, true, IsGB18030(s))
+	assert.Equal(t, s, ToUTF8(s))
 }
