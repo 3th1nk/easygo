@@ -1,4 +1,4 @@
-package delayWorker
+package lazyWorker
 
 import (
 	"github.com/3th1nk/easygo/util/strUtil"
@@ -7,28 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 )
-
-const (
-	StateCreated int32 = iota
-	StateRunning
-	StateStopping
-	StateStopped
-)
-
-func StateString(state int32) string {
-	switch state {
-	case StateCreated:
-		return "created"
-	case StateRunning:
-		return "running"
-	case StateStopping:
-		return "stopping"
-	case StateStopped:
-		return "stopped"
-	default:
-		return "unknown"
-	}
-}
 
 type Worker struct {
 	name    string                   // 名称
@@ -62,7 +40,7 @@ func New(name string, handler func(jobs []interface{}), opts ...*Options) *Worke
 		handler: handler,
 		stop:    make(chan bool, 1),
 		inited:  false,
-		state:   StateCreated,
+		state:   int32(StateCreated),
 		opt:     opt,
 	}
 }
@@ -84,12 +62,12 @@ func (this *Worker) init() error {
 			}
 		} else {
 			this.opt.Parallel = false
-			this.opt.Logger.Warn("delayWorker[%s] parallel is disabled because of cpu core is 1", this.name)
+			this.opt.Logger.Warn("lazyWorker[%s] parallel is disabled because of cpu core is 1", this.name)
 		}
 	}
 
 	this.receive = make(chan interface{}, this.opt.QueueSize)
-	this.buf = make([]interface{}, 0, this.opt.DelaySize)
+	this.buf = make([]interface{}, 0, this.opt.LazySize)
 	return nil
 }
 
@@ -103,37 +81,45 @@ func (this *Worker) release() {
 	}
 }
 
-func (this *Worker) State() int32 {
-	return atomic.LoadInt32(&this.state)
+func (this *Worker) State() State {
+	return State(atomic.LoadInt32(&this.state))
+}
+
+func (this *Worker) SetState(state State) {
+	atomic.StoreInt32(&this.state, int32(state))
+}
+
+func (this *Worker) CmpAndSwapState(old, new State) bool {
+	return atomic.CompareAndSwapInt32(&this.state, int32(old), int32(new))
 }
 
 func (this *Worker) Stop() {
-	if atomic.CompareAndSwapInt32(&this.state, StateRunning, StateStopping) {
-		this.opt.Logger.Debug("delayWorker[%s] is stopping", this.name)
+	if this.CmpAndSwapState(StateRunning, StateStopping) {
+		this.opt.Logger.Debug("lazyWorker[%s] is stopping", this.name)
 
 		// wait for all jobs to be processed
 		this.stop <- true
-		for atomic.LoadInt32(&this.state) == StateStopping {
-			this.opt.Logger.Debug("delayWorker[%s] is waiting stopped, current state is:%s", this.name, StateString(atomic.LoadInt32(&this.state)))
+		for this.State() == StateStopping {
+			this.opt.Logger.Debug("lazyWorker[%s] is waiting stopped, current state is:%s", this.name, this.State())
 			time.Sleep(time.Millisecond * 100)
 		}
-	} else if atomic.CompareAndSwapInt32(&this.state, StateCreated, StateStopped) {
+	} else if this.CmpAndSwapState(StateCreated, StateStopped) {
 		// do nothing
 	}
 
 	if s := this.opt.statistics(); s != "" {
-		this.opt.Logger.Debug("delayWorker[%s] is stopped, %s", this.name, s)
+		this.opt.Logger.Debug("lazyWorker[%s] is stopped, %s", this.name, s)
 	} else {
-		this.opt.Logger.Debug("delayWorker[%s] is stopped", this.name)
+		this.opt.Logger.Debug("lazyWorker[%s] is stopped", this.name)
 	}
 }
 
 func (this *Worker) Push(job interface{}) {
-	if atomic.LoadInt32(&this.state) == StateRunning {
+	if this.State() == StateRunning {
 		this.receive <- job
 		this.opt.incReceive(1)
 	} else {
-		this.opt.Logger.Warn("delayWorker[%s] is not running, job is dropped", this.name)
+		this.opt.Logger.Warn("lazyWorker[%s] is not running, job is dropped", this.name)
 		this.opt.incDrop(1)
 	}
 }
@@ -146,9 +132,9 @@ func (this *Worker) do() {
 	//st := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
-			this.opt.Logger.Error("delayWorker[%s] do panic:%s", this.name, r)
+			this.opt.Logger.Error("lazyWorker[%s] do panic:%s", this.name, r)
 		}
-		//this.opt.Logger.Debug("delayWorker[%s] do %d jobs, cost:%s", this.name, len(this.buf), time.Since(st))
+		//this.opt.Logger.Debug("lazyWorker[%s] do %d jobs, cost:%s", this.name, len(this.buf), time.Since(st))
 		this.opt.incDone(len(this.buf))
 		// !!!clear buf even if panic occurred
 		this.buf = this.buf[:0]
@@ -166,24 +152,24 @@ func (this *Worker) do() {
 }
 
 func (this *Worker) Run() {
-	if !atomic.CompareAndSwapInt32(&this.state, StateCreated, StateRunning) &&
-		!atomic.CompareAndSwapInt32(&this.state, StateStopped, StateRunning) {
-		this.opt.Logger.Error("delayWorker[%s] is in state %s, cannot be started", this.name, StateString(atomic.LoadInt32(&this.state)))
+	if !this.CmpAndSwapState(StateCreated, StateRunning) &&
+		!this.CmpAndSwapState(StateStopped, StateRunning) {
+		this.opt.Logger.Error("lazyWorker[%s] is in state %s, cannot be started", this.name, this.State())
 		return
 	}
 
 	if err := this.init(); err != nil {
-		this.opt.Logger.Error("delayWorker[%s] init error:%s", this.name, err)
-		atomic.StoreInt32(&this.state, StateStopped)
+		this.opt.Logger.Error("lazyWorker[%s] init error:%s", this.name, err)
+		this.SetState(StateStopped)
 		return
 	}
-	this.opt.Logger.Debug("delayWorker[%s] is running", this.name)
+	this.opt.Logger.Debug("lazyWorker[%s] is running", this.name)
 
 	go func() {
-		var ticker = time.NewTicker(this.opt.DelayTime)
+		var ticker = time.NewTicker(this.opt.LazyInterval)
 		defer func() {
 			if r := recover(); r != nil {
-				this.opt.Logger.Fatal("delayWorker[%s] panic:%s", this.name, r)
+				this.opt.Logger.Fatal("lazyWorker[%s] panic:%s", this.name, r)
 			}
 			ticker.Stop()
 
@@ -193,7 +179,7 @@ func (this *Worker) Run() {
 				select {
 				case job := <-this.receive:
 					this.buf = append(this.buf, job)
-					if len(this.buf) >= this.opt.DelaySize {
+					if len(this.buf) >= this.opt.LazySize {
 						this.do()
 					}
 
@@ -207,23 +193,23 @@ func (this *Worker) Run() {
 			// release resources
 			this.release()
 
-			atomic.StoreInt32(&this.state, StateStopped)
+			this.SetState(StateStopped)
 		}()
 
 		for {
 			select {
 			case <-this.stop:
-				this.opt.Logger.Debug("delayWorker[%s] receive stop signal", this.name)
+				this.opt.Logger.Debug("lazyWorker[%s] receive stop signal", this.name)
 				return
 
 			case <-ticker.C:
-				//this.opt.Logger.Debug("delayWorker[%s] ticker", this.name)
+				//this.opt.Logger.Debug("lazyWorker[%s] ticker", this.name)
 				this.do()
 
 			case job := <-this.receive:
 				this.buf = append(this.buf, job)
-				if len(this.buf) >= this.opt.DelaySize {
-					//this.opt.Logger.Debug("delayWorker[%s] buf is full", this.name)
+				if len(this.buf) >= this.opt.LazySize {
+					//this.opt.Logger.Debug("lazyWorker[%s] buf is full", this.name)
 					this.do()
 				}
 			}

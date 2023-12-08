@@ -1,4 +1,4 @@
-package delayWorker
+package lazyWorker
 
 import (
 	"github.com/3th1nk/easygo/util/logs"
@@ -6,11 +6,11 @@ import (
 )
 
 type Options struct {
-	QueueSize int
-	DelaySize int
-	DelayTime time.Duration
-	Parallel  bool
-	Logger    logs.Logger
+	QueueSize    int
+	LazySize     int
+	LazyInterval time.Duration
+	Parallel     bool
+	Logger       logs.Logger
 
 	// 调试模式
 	debug   bool
@@ -19,20 +19,20 @@ type Options struct {
 
 func DefaultOptions() *Options {
 	return &Options{
-		QueueSize: 1000,
-		DelaySize: 100,
-		DelayTime: 5 * time.Second,
-		Parallel:  false,
-		Logger:    logs.Default,
+		QueueSize:    1000,
+		LazySize:     100,
+		LazyInterval: 5 * time.Second,
+		Parallel:     false,
+		Logger:       logs.Default,
 	}
 }
 
 func (opt *Options) ensure() {
-	if opt.DelayTime <= 0 {
-		opt.DelayTime = 5 * time.Second
+	if opt.LazyInterval <= 0 {
+		opt.LazyInterval = 5 * time.Second
 	}
-	if opt.DelaySize <= 0 {
-		opt.DelaySize = 100
+	if opt.LazySize <= 0 {
+		opt.LazySize = 100
 	}
 	if opt.QueueSize <= 0 {
 		opt.QueueSize = 1000
@@ -81,13 +81,13 @@ func (this *Worker) Debug() *Worker {
 	return this
 }
 
-func (this *Worker) WithDelaySize(size int) *Worker {
-	this.opt.DelaySize = size
+func (this *Worker) WithLazySize(size int) *Worker {
+	this.opt.LazySize = size
 	return this
 }
 
-func (this *Worker) WithDelayTime(d time.Duration) *Worker {
-	this.opt.DelayTime = d
+func (this *Worker) WithLazyInterval(d time.Duration) *Worker {
+	this.opt.LazyInterval = d
 	return this
 }
 

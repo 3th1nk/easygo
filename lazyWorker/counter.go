@@ -1,4 +1,4 @@
-package delayWorker
+package lazyWorker
 
 import (
 	"fmt"
