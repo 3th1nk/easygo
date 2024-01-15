@@ -119,6 +119,9 @@ loop:
 }
 
 func ToGBK(s string) string {
+	if IsGBK(s) {
+		return s
+	}
 	if IsUTF8(s) {
 		s1, err := simplifiedchinese.GBK.NewEncoder().String(s)
 		if err == nil {
@@ -130,6 +133,9 @@ func ToGBK(s string) string {
 }
 
 func ToGB18030(s string) string {
+	if IsGB18030(s) {
+		return s
+	}
 	if IsUTF8(s) {
 		s1, err := simplifiedchinese.GB18030.NewEncoder().String(s)
 		if err == nil {
