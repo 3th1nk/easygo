@@ -1,11 +1,14 @@
 package kafka
 
 import (
+	"context"
 	"github.com/3th1nk/easygo/util/runtimeUtil"
 	"github.com/IBM/sarama"
 	"github.com/panjf2000/ants/v2"
 	"sync"
 )
+
+type ConsumeHandler func(msg *sarama.ConsumerMessage) error
 
 func (this *Kafka) ensureConsumer() (err error) {
 	if this.consumer != nil {
@@ -24,7 +27,7 @@ func (this *Kafka) ensureConsumer() (err error) {
 	return nil
 }
 
-func (this *Kafka) consumePartition(topic string, partition int32, offset int64, handler func(msg *sarama.ConsumerMessage) error) {
+func (this *Kafka) consumePartition(ctx context.Context, topic string, partition int32, offset int64, handler ConsumeHandler) {
 	defer runtimeUtil.Recover()
 
 	if err := this.ensureConsumer(); err != nil {
@@ -43,11 +46,20 @@ func (this *Kafka) consumePartition(topic string, partition int32, offset int64,
 		}
 	}()
 
+	go func() {
+		for e := range pc.Errors() {
+			this.opt.Logger.Error("Consume(%s, %d, %d) error: %v", e.Topic, e.Partition, e.Err)
+		}
+	}()
+
 	pool, _ := ants.NewPool(this.opt.ConsumeConcurrent)
 	defer pool.Release()
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
+
 		case message := <-pc.Messages():
 			if err = pool.Submit(func() {
 				if err = handler(message); err != nil {
@@ -56,14 +68,11 @@ func (this *Kafka) consumePartition(topic string, partition int32, offset int64,
 			}); err != nil {
 				this.opt.Logger.Error("Consume(%s, %d, %d) pool submit error: %v", topic, partition, offset, err)
 			}
-
-		case e := <-pc.Errors():
-			this.opt.Logger.Error("Consume(%s, %d, %d) error: %v", e.Topic, e.Partition, e.Err)
 		}
 	}
 }
 
-func (this *Kafka) consume(topic string, offset int64, handler func(msg *sarama.ConsumerMessage) error) {
+func (this *Kafka) consume(ctx context.Context, topic string, offset int64, handler ConsumeHandler) {
 	partitions, err := this.client.Partitions(topic)
 	if err != nil {
 		this.opt.Logger.Error("Partitions(%s) error: %v", topic, err)
@@ -76,24 +85,24 @@ func (this *Kafka) consume(topic string, offset int64, handler func(msg *sarama.
 		go func(partition int32) {
 			defer runtimeUtil.Recover()
 			defer wg.Done()
-			this.consumePartition(topic, partition, offset, handler)
+			this.consumePartition(ctx, topic, partition, offset, handler)
 		}(part)
 	}
 	wg.Wait()
 }
 
-func (this *Kafka) ConsumePartitionNewest(topic string, partition int32, handler func(msg *sarama.ConsumerMessage) error) {
-	this.consumePartition(topic, partition, sarama.OffsetNewest, handler)
+func (this *Kafka) ConsumePartitionNewest(ctx context.Context, topic string, partition int32, handler ConsumeHandler) {
+	this.consumePartition(ctx, topic, partition, sarama.OffsetNewest, handler)
 }
 
-func (this *Kafka) ConsumePartitionOldest(topic string, partition int32, handler func(msg *sarama.ConsumerMessage) error) {
-	this.consumePartition(topic, partition, sarama.OffsetOldest, handler)
+func (this *Kafka) ConsumePartitionOldest(ctx context.Context, topic string, partition int32, handler ConsumeHandler) {
+	this.consumePartition(ctx, topic, partition, sarama.OffsetOldest, handler)
 }
 
-func (this *Kafka) ConsumeNewest(topic string, handler func(msg *sarama.ConsumerMessage) error) {
-	this.consume(topic, sarama.OffsetNewest, handler)
+func (this *Kafka) ConsumeNewest(ctx context.Context, topic string, handler ConsumeHandler) {
+	this.consume(ctx, topic, sarama.OffsetNewest, handler)
 }
 
-func (this *Kafka) ConsumeOldest(topic string, handler func(msg *sarama.ConsumerMessage) error) {
-	this.consume(topic, sarama.OffsetOldest, handler)
+func (this *Kafka) ConsumeOldest(ctx context.Context, topic string, handler ConsumeHandler) {
+	this.consume(ctx, topic, sarama.OffsetOldest, handler)
 }
