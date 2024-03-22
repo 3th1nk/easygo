@@ -25,25 +25,25 @@ func Go(n int, f func(i int)) {
 	wg.Wait()
 }
 
-//
+// GoWait 并发超时执行，如果超时时间未执行完成，提前返回
 func GoWait(wait time.Duration, n int, f func(i int, wait time.Duration) (done bool)) (allDone bool) {
 	if n == 0 || f == nil {
 		return true
 	}
 
 	undone := int32(n)
-	doneChan := make(chan bool, 1)
+	doneChan := make(chan bool)
 	for i := 0; i < n; i++ {
 		go func(i int) {
 			if f(i, wait) && atomic.AddInt32(&undone, -1) == 0 {
-				doneChan <- true
+				close(doneChan)
 			}
 		}(i)
 	}
 
 	if wait > 0 {
 		select {
-		case allDone = <-doneChan:
+		case <-doneChan:
 			return true
 		case <-time.After(wait):
 			return false

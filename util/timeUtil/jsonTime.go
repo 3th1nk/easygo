@@ -50,7 +50,7 @@ func (this JsonTime) Value() (driver.Value, error) {
 func (this *JsonTime) Scan(v interface{}) (err error) {
 	switch t := v.(type) {
 	case time.Time:
-		this.Time = t
+		this.Time, err = Parse(t.Format(DateTime))
 	case string:
 		this.Time, err = Parse(t)
 	case []byte:

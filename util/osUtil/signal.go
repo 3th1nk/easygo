@@ -50,11 +50,9 @@ func OnSignalExitNoLog(f func(sig syscall.Signal), msg ...string) {
 }
 
 func addSigWrap(w *sigFuncWrap) {
-	if w.logging {
-		_, w.file, w.line, _ = runtimeUtil.Caller(2)
-		if w.file == "" {
-			w.file = "???"
-		}
+	_, w.file, w.line, _ = runtimeUtil.Caller(2)
+	if w.file == "" {
+		w.file = "???"
 	}
 	onSig = append(onSig, w)
 }
@@ -79,13 +77,16 @@ func init() {
 		for i := len(onSig) - 1; i >= 0; i-- {
 			start := time.Now()
 			v := onSig[i]
+			if logger != nil {
+				logger.Info("on signal exit: %v, %v:%v", v.msg, v.file, v.line)
+			}
 			ok := v.f(exitSig)
 			if v.logging && logger != nil {
-				took := time.Now().Sub(start).Round(time.Millisecond)
+				took := time.Since(start).Round(time.Millisecond)
 				if v.msg != "" {
-					logger.Info("on signal exit: %v, ok=%v, took=%v, %v:%v", v.msg, ok, took, v.file, v.line)
+					logger.Info("\t on signal exit: %v, ok=%v, took=%v, %v:%v", v.msg, ok, took, v.file, v.line)
 				} else {
-					logger.Info("on signal exit: ok=%v, took=%v, %v:%v", ok, took, v.file, v.line)
+					logger.Info("\t on signal exit: ok=%v, took=%v, %v:%v", ok, took, v.file, v.line)
 				}
 			}
 		}
