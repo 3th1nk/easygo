@@ -81,29 +81,29 @@ func (this *Worker) release() {
 	}
 }
 
-func (this *Worker) State() State {
+func (this *Worker) getState() State {
 	return State(atomic.LoadInt32(&this.state))
 }
 
-func (this *Worker) SetState(state State) {
+func (this *Worker) setState(state State) {
 	atomic.StoreInt32(&this.state, int32(state))
 }
 
-func (this *Worker) CmpAndSwapState(old, new State) bool {
+func (this *Worker) cmpAndSwapState(old, new State) bool {
 	return atomic.CompareAndSwapInt32(&this.state, int32(old), int32(new))
 }
 
 func (this *Worker) Stop() {
-	if this.CmpAndSwapState(StateRunning, StateStopping) {
+	if this.cmpAndSwapState(StateRunning, StateStopping) {
 		this.opt.Logger.Debug("lazyWorker[%s] is stopping", this.name)
 
 		// wait for all jobs to be processed
 		this.stop <- true
-		for this.State() == StateStopping {
-			this.opt.Logger.Debug("lazyWorker[%s] is waiting stopped, current state is:%s", this.name, this.State())
+		for this.getState() == StateStopping {
+			this.opt.Logger.Debug("lazyWorker[%s] is waiting stopped, current state is:%s", this.name, this.getState())
 			time.Sleep(time.Millisecond * 100)
 		}
-	} else if this.CmpAndSwapState(StateCreated, StateStopped) {
+	} else if this.cmpAndSwapState(StateCreated, StateStopped) {
 		// do nothing
 	}
 
@@ -115,7 +115,7 @@ func (this *Worker) Stop() {
 }
 
 func (this *Worker) Push(job interface{}) {
-	if this.State() == StateRunning {
+	if this.getState() == StateRunning {
 		this.receive <- job
 		this.opt.incReceive(1)
 	} else {
@@ -152,15 +152,15 @@ func (this *Worker) do() {
 }
 
 func (this *Worker) Run() {
-	if !this.CmpAndSwapState(StateCreated, StateRunning) &&
-		!this.CmpAndSwapState(StateStopped, StateRunning) {
-		this.opt.Logger.Error("lazyWorker[%s] is in state %s, cannot be started", this.name, this.State())
+	if !this.cmpAndSwapState(StateCreated, StateRunning) &&
+		!this.cmpAndSwapState(StateStopped, StateRunning) {
+		this.opt.Logger.Error("lazyWorker[%s] is in state %s, cannot be started", this.name, this.getState())
 		return
 	}
 
 	if err := this.init(); err != nil {
 		this.opt.Logger.Error("lazyWorker[%s] init error:%s", this.name, err)
-		this.SetState(StateStopped)
+		this.setState(StateStopped)
 		return
 	}
 	this.opt.Logger.Debug("lazyWorker[%s] is running", this.name)
@@ -193,7 +193,7 @@ func (this *Worker) Run() {
 			// release resources
 			this.release()
 
-			this.SetState(StateStopped)
+			this.setState(StateStopped)
 		}()
 
 		for {
