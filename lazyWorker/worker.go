@@ -52,7 +52,7 @@ func (this *Worker) init() error {
 	this.inited = true
 
 	this.opt.ensure()
-	if this.opt.Parallel {
+	if !this.opt.Serialization {
 		if runtime.NumCPU() > 1 {
 			var err error
 			this.pool, err = ants.NewPool(runtime.NumCPU())
@@ -61,8 +61,8 @@ func (this *Worker) init() error {
 				return err
 			}
 		} else {
-			this.opt.Parallel = false
-			this.opt.Logger.Warn("lazyWorker[%s] parallel is disabled because of cpu core is 1", this.name)
+			this.opt.Serialization = true
+			this.opt.Logger.Warn("lazyWorker[%s] concurrency is disabled because of cpu core is 1", this.name)
 		}
 	}
 
@@ -140,7 +140,7 @@ func (this *Worker) do() {
 		this.buf = this.buf[:0]
 	}()
 
-	if this.opt.Parallel {
+	if !this.opt.Serialization {
 		copyBuf := make([]interface{}, len(this.buf))
 		copy(copyBuf, this.buf)
 		_ = this.pool.Submit(func() {

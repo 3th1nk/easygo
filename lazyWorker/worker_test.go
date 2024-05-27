@@ -38,7 +38,7 @@ func TestParallelWorker(t *testing.T) {
 	w := New("test", handler)
 	defer w.Stop()
 
-	w.WithQueueSize(50).WithLazyInterval(2 * time.Second).WithLazySize(10).WithParallel(true).Debug().Run()
+	w.WithQueueSize(50).WithLazyInterval(2 * time.Second).WithLazySize(10).Debug().Run()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -75,7 +75,7 @@ func TestRestart(t *testing.T) {
 	w.Stop()
 
 	t.Log("restart")
-	w.WithQueueSize(50).WithLazyInterval(2 * time.Second).WithLazySize(10).WithParallel(true).Run()
+	w.WithQueueSize(50).WithLazyInterval(2 * time.Second).WithLazySize(10).Run()
 	for i := 0; i < 100; i++ {
 		j := i
 		func() {

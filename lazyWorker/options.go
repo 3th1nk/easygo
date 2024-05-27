@@ -6,11 +6,11 @@ import (
 )
 
 type Options struct {
-	QueueSize    int
-	LazySize     int
-	LazyInterval time.Duration
-	Parallel     bool
-	Logger       logs.Logger
+	QueueSize     int
+	LazySize      int
+	LazyInterval  time.Duration
+	Serialization bool // 是否串行化执行, 默认true，保持数据处理的顺序
+	Logger        logs.Logger
 
 	// 调试模式
 	debug   bool
@@ -19,11 +19,11 @@ type Options struct {
 
 func DefaultOptions() *Options {
 	return &Options{
-		QueueSize:    1000,
-		LazySize:     100,
-		LazyInterval: 5 * time.Second,
-		Parallel:     false,
-		Logger:       logs.Default,
+		QueueSize:     1000,
+		LazySize:      100,
+		LazyInterval:  5 * time.Second,
+		Serialization: true,
+		Logger:        logs.Default,
 	}
 }
 
@@ -96,8 +96,8 @@ func (this *Worker) WithQueueSize(size int) *Worker {
 	return this
 }
 
-func (this *Worker) WithParallel(enable bool) *Worker {
-	this.opt.Parallel = enable
+func (this *Worker) WithSerialization(enable bool) *Worker {
+	this.opt.Serialization = enable
 	return this
 }
 
