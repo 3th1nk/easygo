@@ -11,7 +11,7 @@ import (
 )
 
 func (this *Client) buildWriteUrl(db, rp string) string {
-	uri := strings.TrimSuffix(this.addr, "/") + "/write?precision=" + this.writePrecision
+	uri := this.addr + "/write?precision=" + this.writePrecision
 	if db != "" {
 		uri += "&db=" + url.QueryEscape(db)
 	}

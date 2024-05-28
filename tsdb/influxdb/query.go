@@ -9,7 +9,7 @@ import (
 )
 
 func (this *Client) buildQueryUrl(db, sql string) string {
-	uri := strings.TrimSuffix(this.addr, "/") + "/query?epoch=" + this.queryEpoch
+	uri := this.addr + "/query?epoch=" + this.queryEpoch
 	if db != "" {
 		uri += "&db=" + url.QueryEscape(db)
 	}
