@@ -5,40 +5,79 @@ import (
 	"unicode"
 )
 
-// ToLowerAndEscape 将字符串转为小写，并将特殊字符(下划线、连接符、点号除外)替换为下划线，可用于格式化measurement名称
-func ToLowerAndEscape(s string) string {
-	s = strings.ToLower(s)
-	s = strings.Replace(s, "-", "_", -1)
-	s = strings.Replace(s, "/", "_", -1)
-	s = strings.Replace(s, " ", "_", -1)
-	return s
+// FormatMeasurement 统一measurement命名规范，避免特殊字符
+func FormatMeasurement(s string) string {
+	return strings.Map(func(r rune) rune {
+		// 统一小写
+		r = unicode.ToLower(r)
+		// 替换 A-Z a-z 0-9 _-. 之外的字符
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' || r == '.' {
+			return r
+		}
+		return '_'
+	}, s)
 }
 
-// EscapeTagValue 将tag值中不合规的字符进行转义
+// EscapeTagValue 写入数据时，需要将tag字段值中不合规的字符进行转义
+//	行协议：https://docs.influxdata.com/influxdb/v1/write_protocols/line_protocol_reference
 func EscapeTagValue(s string) string {
+	// 统一去除前后空格
 	s = strings.TrimSpace(s)
-	s = strings.Replace(s, `\`, `\\`, -1)
-	s = strings.Replace(s, "\n", "\\n", -1)
-	for _, k := range []string{" ", ",", "="} {
-		s = strings.Replace(s, k, `\\`+k, -1)
+	// 尾部反斜杠需要特殊处理
+	s = EscapeTagTailBackslash(s)
+
+	// 空格、逗号、等号需要转义
+	return strings.NewReplacer(
+		" ", "\\ ",
+		",", "\\,",
+		"=", "\\=",
+	).Replace(s)
+}
+
+// EscapeFieldValue 写入数据时，需要将field值中不合规的字符进行转义
+func EscapeFieldValue(s string) string {
+	// 统一去除前后空格
+	s = strings.TrimSpace(s)
+
+	// 单引号、反斜杠需要转义
+	return strings.NewReplacer(
+		`"`, `\"`,
+		`\`, `\\`,
+	).Replace(s)
+}
+
+// EscapeCondValue 查询数据时，需要将条件值中部分字符进行转义
+//  由于tag和field写入时转义稍有差别，所以查询条件也需要区分，通常都是用tag字段作为条件，如果是field字段，需要额外指定 isFieldVal=true
+//	https://docs.influxdata.com/influxdb/v1/query_language/data_exploration/#string-literals
+func EscapeCondValue(s string, isFieldVal ...bool) string {
+	s = strings.TrimSpace(s)
+	// field字段尾部反斜杠写入时不需要特殊处理，所以查询条件中也不需要处理
+	if len(isFieldVal) == 0 || !isFieldVal[0] {
+		s = EscapeTagTailBackslash(s)
 	}
+
+	// 单引号、反斜杠需要转义
+	return strings.NewReplacer(
+		`'`, `\'`,
+		`\`, `\\`,
+	).Replace(s)
+}
+
+// EscapeTagTailBackslash 写入数据时，标签字段尾部的反斜杠会对后面的空格进行转义，导致行协议无法正确解析，所以需要额外处理，查询时也需要对齐
+func EscapeTagTailBackslash(s string) string {
 	if strings.HasSuffix(s, `\`) {
-		// influxdb不允许value以斜杠结尾，加一个空格
-		s = s + ` `
+		return s + ` `
 	}
 	return s
 }
 
-// EscapeFieldValue 将field值中不合规的字符进行转义
-func EscapeFieldValue(value string) string {
-	value = strings.TrimSpace(value)
-	value = strings.Replace(value, "\n", "", -1)
-	value = strings.Replace(value, `"`, ``, -1)
-	if strings.HasSuffix(value, `\`) {
-		// influxdb不允许value以斜杠结尾，加一个空格
-		value = value + `\ `
+// UnescapeQueryResultValue 还原查询结果中tag、field值的转义
+//	写入时(RawWrite除外)tag、field值转义时都移除了前后空格，唯一特殊情况是以反斜杠结尾的tag字段，特殊追加了一个空格，所以查询结果中需要去掉，以保持一致
+func UnescapeQueryResultValue(s string) string {
+	if strings.HasSuffix(s, `\ `) {
+		s = s[:len(s)-1]
 	}
-	return value
+	return s
 }
 
 // Quote 给字符串加上双引号
@@ -46,7 +85,7 @@ func Quote(s string) string {
 	return `"` + s + `"`
 }
 
-// QuoteIfNeed 如有必要，给字符串加上双引号，否则返回原字符串
+// QuoteIfNeed 如有必要，给字段的Key加上双引号，否则返回原字符串
 //	https://docs.influxdata.com/influxdb/v1/query_language/explore-data/#quoting
 func QuoteIfNeed(s string) string {
 	if len(s) == 0 {
@@ -69,7 +108,7 @@ func QuoteIfNeed(s string) string {
 	return s
 }
 
-// SingleQuote 给字符串加上单引号
+// SingleQuote 给查询条件值加上单引号
 //	https://docs.influxdata.com/influxdb/v1/troubleshooting/frequently-asked-questions/#when-should-i-single-quote-and-when-should-i-double-quote-in-queries
 func SingleQuote(s string) string {
 	return `'` + s + `'`

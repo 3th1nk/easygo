@@ -36,6 +36,6 @@ func TestClient_CreateRetentionPolicies(t *testing.T) {
 	data, err := influx.ShowRetentionPolicies(testDB)
 	fmt.Println(jsonUtil.MustMarshalToStringIndent(data))
 
-	//err = influx.DropRetentionPolicy(testDB, testRP.Name)
-	//assert.NoError(t, err)
+	err = influx.DropRetentionPolicy(testDB, testRP.Name)
+	assert.NoError(t, err)
 }

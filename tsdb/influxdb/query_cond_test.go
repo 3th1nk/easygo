@@ -14,7 +14,7 @@ func TestExpr(t *testing.T) {
 func TestSimpleExpr(t *testing.T) {
 	t.Log(Expr("n", "=", 1))
 	t.Log(Expr("s", "=", "a"))
-	t.Log(Expr("s", "=", "a AND b != 'c'"))
+	t.Log(Expr("s", "=", "a AND b != \"c\""))
 	t.Log(Expr("time", ">=", "2024-01-01"))
 	t.Log(Expr("time", ">=", 1716355881))
 }
@@ -55,4 +55,16 @@ func TestNotIn(t *testing.T) {
 	t.Log(NotIn("n", 1, 2, 3))
 	t.Log(NotIn("s", "a", "b", "c"))
 	t.Log(NotIn("time", "2024-01-01", "2024-05-01"))
+}
+
+func TestLike(t *testing.T) {
+	t.Log(Match("s", "a.*"))
+	t.Log(Match("s", "^a.*"))
+	t.Log(Match("s", "a.*$"))
+}
+
+func TestNotLike(t *testing.T) {
+	t.Log(NotMatch("s", "a.*"))
+	t.Log(NotMatch("s", "^a.*"))
+	t.Log(NotMatch("s", "a.*$"))
 }

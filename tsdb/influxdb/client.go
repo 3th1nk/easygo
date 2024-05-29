@@ -29,7 +29,7 @@ type Client struct {
 	groupSize       int                     // 每组桶的数量，默认16
 	queryEpoch      string                  // 查询返回的时间格式, 默认s
 	writePrecision  string                  // 写入数据的时间精度, 默认s
-	writeSortTagKey bool                    // 写入数据时是否对tag key排序, 默认不开启
+	writeSortTagKey bool                    // 写入数据时是否对tag key排序, 默认开启
 	flushInterval   time.Duration           // 异步写入数据的时间间隔, 默认1分钟
 	debugger        *debugger               // 调试器, 默认不开启
 	writePoolSize   int                     //
@@ -41,15 +41,16 @@ type Client struct {
 
 func NewClient(addr string, opts ...Option) *Client {
 	c := &Client{
-		addr:           strings.TrimSuffix(addr, "/"),
-		bucketGroups:   make(map[string]*bucketGroup, 8),
-		groupSize:      16,
-		queryEpoch:     "s",
-		writePrecision: "s",
-		flushInterval:  time.Minute,
-		writePoolSize:  30,
-		stopSignal:     make(chan struct{}, 1),
-		logger:         logs.Default,
+		addr:            strings.TrimSuffix(addr, "/"),
+		bucketGroups:    make(map[string]*bucketGroup, 8),
+		groupSize:       16,
+		queryEpoch:      "s",
+		writePrecision:  "s",
+		writeSortTagKey: true,
+		flushInterval:   time.Minute,
+		writePoolSize:   30,
+		stopSignal:      make(chan struct{}, 1),
+		logger:          logs.Default,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -171,11 +172,14 @@ func (this *Client) doBatchWrite(writeUrl string, lines []string) error {
 			end = len(lines)
 		}
 
-		this.logger.Debug("[InfluxDB] 写入数据 url=%v, lines=%d", writeUrl, len(lines[i:end]))
-		resBody, err := doRequest(http.MethodPost, writeUrl, "", strings.Join(lines[i:end], "\n"), nil)
+		data := strings.Join(lines[i:end], "\n")
+		if this.debugger != nil {
+			this.logger.Debug("[InfluxDB] 写入数据 url=%v, line_count=%d, lines=\n%s", writeUrl, len(lines[i:end]), data)
+		}
+		resBody, err := doRequest(http.MethodPost, writeUrl, "", data, nil)
 		if err != nil {
 			this.countWrite(false)
-			err = fmt.Errorf("[InfluxDB] url=%v, err=%v, resp=%v", writeUrl, err.Error(), string(resBody))
+			this.logger.Error("[InfluxDB] url=%v, err=%v, resp=%v", writeUrl, err.Error(), string(resBody))
 			this.logger.Error(err.Error())
 			return err
 		}

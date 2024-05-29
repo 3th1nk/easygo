@@ -162,6 +162,7 @@ func usingFunction(s string) bool {
 	}
 
 	// 需要有一个成对的右括号，但不一定是最后一个字符，因为有可能用了别名
+	//	！！！这里只是一个简单判断！！！
 	if !strings.Contains(s[idx+1:], ")") {
 		return false
 	}

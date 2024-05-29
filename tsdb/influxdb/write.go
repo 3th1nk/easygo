@@ -30,7 +30,7 @@ func (this *Client) buildWriteUrl(db, rp string) string {
 // RawWrite 执行写入操作
 //	- db: 数据库名，必须指定
 //	- rp: 保留策略名，为空时使用默认
-//	- lines: 符合influxdb行协议的数据
+//	- lines: 符合influxdb行协议的数据，需自行处理转义
 func (this *Client) RawWrite(db, rp string, lines []string) error {
 	if db == "" {
 		return fmt.Errorf("missing database")
@@ -41,13 +41,11 @@ func (this *Client) RawWrite(db, rp string, lines []string) error {
 }
 
 // Point 数据点
-//	注意：
-//		1、表名、标签字段、值字段相关的转义由底层处理；
-//		2、写入精度默认为秒，可以通过 WithWritePrecision 设置
+//	注意：写入精度默认为秒，可以通过 WithWritePrecision 设置
 type Point struct {
 	Measurement string                 // 表名，必须指定
-	Tags        map[string]interface{} // 标签字段
-	Values      map[string]interface{} // 值字段
+	Tags        map[string]interface{} // tag字段
+	Fields      map[string]interface{} // field字段
 	Time        int64                  // 时间戳，不传时数据库会自动写入当前时间
 }
 
@@ -58,7 +56,7 @@ func (p *Point) ToLineData(sortTagKey bool) string {
 	tagArr := make([]string, 0, len(p.Tags))
 	if sortTagKey {
 		// 标签按照key排序，提升写入性能
-		// https://docs.influxdata.com/influxdb/v2/write-data/best-practices/optimize-writes/#sort-tags-by-key
+		// https://docs.influxdata.com/influxdb/v1/write_protocols/line_protocol_reference/#performance-tips
 		sortedTagKey := make([]string, 0, len(p.Tags))
 		for k := range p.Tags {
 			sortedTagKey = append(sortedTagKey, k)
@@ -72,7 +70,7 @@ func (p *Point) ToLineData(sortTagKey bool) string {
 			if t, ok := v.(string); ok {
 				v = EscapeTagValue(t)
 			}
-			tagArr = append(tagArr, fmt.Sprintf("%s=%v", QuoteIfNeed(k), v))
+			tagArr = append(tagArr, fmt.Sprintf("%s=%v", k, v))
 		}
 
 	} else {
@@ -80,24 +78,24 @@ func (p *Point) ToLineData(sortTagKey bool) string {
 			if t, ok := v.(string); ok {
 				v = EscapeTagValue(t)
 			}
-			tagArr = append(tagArr, fmt.Sprintf("%s=%v", QuoteIfNeed(k), v))
+			tagArr = append(tagArr, fmt.Sprintf("%s=%v", k, v))
 		}
 	}
 
-	valueArr := make([]string, 0, len(p.Values))
-	for k, v := range p.Values {
+	fieldArr := make([]string, 0, len(p.Fields))
+	for k, v := range p.Fields {
 		if t, ok := v.(string); ok {
 			v = Quote(EscapeFieldValue(t))
 		}
-		valueArr = append(valueArr, fmt.Sprintf("%s=%v", QuoteIfNeed(k), v))
+		fieldArr = append(fieldArr, fmt.Sprintf(`%s=%v`, k, v))
 	}
 
-	data := ToLowerAndEscape(p.Measurement)
+	data := p.Measurement
 	if len(tagArr) > 0 {
 		data += "," + strings.Join(tagArr, ",")
 	}
-	if len(valueArr) > 0 {
-		data += " " + strings.Join(valueArr, ",")
+	if len(fieldArr) > 0 {
+		data += " " + strings.Join(fieldArr, ",")
 	}
 	if p.Time > 0 {
 		data += fmt.Sprintf(" %d", p.Time)

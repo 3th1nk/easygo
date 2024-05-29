@@ -140,7 +140,6 @@ type condRawExpr struct {
 }
 
 // RawExpr 表达式
-//	注意：调用方自行处理Key转义、Value单双引号等，可使用 EscapeTagValue、EscapeFieldValue 等方法
 func RawExpr(expr string) ICond {
 	return condRawExpr{expr: expr}
 }
@@ -171,7 +170,7 @@ type condExpr struct {
 
 // Expr 表达式
 //	- col: 字段名，支持tag字段（包含time）
-//	- opr: 操作符，支持 =, !=, >, <, >=, <=
+//	- opr: 操作符，支持 =, !=, >, <, >=, <=, <>, =~, !~
 //	- val: 字段值，支持数值、字符串
 func Expr(col, opr string, val interface{}) ICond {
 	return condExpr{col, opr, val}
@@ -189,8 +188,10 @@ func (c condExpr) String() string {
 		}
 	} else {
 		c.col = QuoteIfNeed(c.col)
-		// 非时间字段值总是带单引号，这里不考虑field字段(理论上有可能数值型的field字段值用作查询条件，此时值无需加单引号)
-		c.val = SingleQuote(EscapeTagValue(convertor.ToStringNoError(c.val)))
+		// TODO tag字段值是字符串类型，所以查询条件值总带单引号，暂不考虑field字段：
+		//	1、有可能数值型的field字段值用作查询条件，此时值无需加单引号
+		//	2、field字段值使用EscapeCondValue时需要指定isFieldVal=true
+		c.val = SingleQuote(EscapeCondValue(convertor.ToStringNoError(c.val)))
 	}
 
 	return fmt.Sprintf(`%s %s %v`, c.col, c.opr, c.val)
@@ -206,7 +207,7 @@ func (c condExpr) Or(arr ...ICond) ICond {
 
 func (c condExpr) IsValid() bool {
 	return len(c.col) > 0 && c.val != nil &&
-		slice.ContainsString([]string{"=", "!=", ">", "<", ">=", "<="}, c.opr)
+		slice.ContainsString([]string{"=", "!=", ">", "<", ">=", "<=", "<>", "=~", "!~"}, c.opr)
 }
 
 // Between 左右均为闭区间
@@ -248,4 +249,17 @@ func NotIn(col string, values ...interface{}) ICond {
 		arr = append(arr, condExpr{col, "!=", val})
 	}
 	return And(arr...)
+}
+
+// Match 模糊匹配
+//	https://docs.influxdata.com/influxdb/v1/query_language/explore-data/#regular-expressions
+//	!!! 注意：正则表达式匹配性能较差，尽量避免使用 !!!
+func Match(col, pattern string) ICond {
+	return condRawExpr{fmt.Sprintf(`%s =~ /%s/`, QuoteIfNeed(col), pattern)}
+}
+
+// NotMatch 不匹配
+//	!!! 注意：正则表达式匹配性能较差，尽量避免使用 !!!
+func NotMatch(col, pattern string) ICond {
+	return condRawExpr{fmt.Sprintf(`%s !~ /%s/`, QuoteIfNeed(col), pattern)}
 }

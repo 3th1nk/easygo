@@ -27,27 +27,30 @@ func (this *Client) buildQueryUrl(db, sql string) string {
 
 type queryResp struct {
 	Results []*struct {
-		StatementId int       `json:"statement_id"`
-		Series      []*Series `json:"series"`
+		StatementId int       `json:"statement_id,omitempty"`
+		Error       string    `json:"error,omitempty"`
+		Series      []*Series `json:"series,omitempty"`
 	} `json:"results"`
 }
 
 // RawQuery 执行查询语句
 //	- db: 数据库名，也可以在sql语句中指定数据库
-//	- sql: 查询语句，需要符合InfluxDB的查询语法，相关key/value格式需要自行处理(ToLowerAndEscape、EscapeTagValue、EscapeFieldValue)
-// 	- sql语法参考：https://docs.influxdata.com/influxdb/v1/query_language/explore-data/#the-basic-select-statement
+//	- sql: 查询语句，语法参考：https://docs.influxdata.com/influxdb/v1/query_language/explore-data/#the-basic-select-statement
 func (this *Client) RawQuery(db, sql string) ([]*Series, error) {
 	queryUrl := this.buildQueryUrl(db, sql)
 	var resp queryResp
 	resBody, err := doRequest(http.MethodGet, queryUrl, "", nil, &resp)
 	if err != nil {
-		err = fmt.Errorf("[InfluxDB] url=%v, err=%v, resp=%v", queryUrl, err.Error(), string(resBody))
 		if logs.IsErrorEnable(this.logger) {
-			this.logger.Error(err.Error())
+			this.logger.Error("[InfluxDB] url=%v, err=%v, resp=%v", queryUrl, err.Error(), string(resBody))
 		}
 		return nil, err
 	}
 	if len(resp.Results) != 0 && resp.Results[0] != nil {
+		if resp.Results[0].Error != "" {
+			this.logger.Error("[InfluxDB] url=%v, err=%v", queryUrl, resp.Results[0].Error)
+			return nil, fmt.Errorf(resp.Results[0].Error)
+		}
 		return resp.Results[0].Series, nil
 	}
 	return []*Series{}, nil
@@ -140,13 +143,14 @@ func (this *Query) from() string {
 		// 	    FROM <database_name>..<measurement_name> // 指定数据库，默认保留策略
 
 		// 对于当前实现而言，如果db未指定，最终也无法查询，所以这里默认db不可能为空
+		//	加双引号是为了防止db、rp、measurement名称中有特殊字符
 		from := Quote(this.db) + `.`
 		if this.rp != "" {
 			from += Quote(this.rp) + `.`
 		} else {
 			from += `.`
 		}
-		from += Quote(ToLowerAndEscape(measurement))
+		from += Quote(measurement)
 		arr = append(arr, from)
 	}
 	return strings.Join(arr, ",")
@@ -162,7 +166,7 @@ func (this *Query) verify() error {
 func (this *Query) String() string {
 	fields := make([]string, 0, len(this.selects))
 	for _, field := range this.selects {
-		if usingFunction(field) {
+		if field == "*" || usingFunction(field) {
 			fields = append(fields, field)
 		} else {
 			fields = append(fields, QuoteIfNeed(field))
