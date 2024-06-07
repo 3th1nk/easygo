@@ -57,8 +57,8 @@ func (this *bucket) PushOrPopAll(lines ...string) []string {
 
 	all := make([]string, popNum)
 	if int(popNum) < this.size {
-		copy(all, this.lines[:popNum+1])
-		this.lines = append(this.lines[popNum+1:], lines...)
+		copy(all, this.lines[:popNum])
+		this.lines = append(this.lines[popNum:], lines...)
 	} else {
 		copy(all, this.lines)
 		offset := int(popNum) - len(this.lines)
