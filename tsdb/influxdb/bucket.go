@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	bucketSize = batchWriteLines * 2 // 桶容量
+	bucketSize = 10000 // 桶容量
 )
 
 func makeBucketGroupName(db, rp string) string {
@@ -18,20 +18,22 @@ func makeBucketGroupName(db, rp string) string {
 // bucket 桶
 //	写入相同db相同rp的数据会被聚合到同一个bucket中批量发送
 type bucket struct {
-	mu    sync.RWMutex
-	size  int
-	lines []string // 行数据
+	mu        sync.RWMutex
+	size      int      // 桶容量
+	flushSize int      // influxdb单次写入量上限
+	lines     []string // 行数据
 }
 
-func newBucket(size int) *bucket {
+func newBucket(size, flushSize int) *bucket {
 	return &bucket{
-		size:  size,
-		lines: make([]string, 0, size),
+		size:      size,
+		flushSize: flushSize,
+		lines:     make([]string, 0, size),
 	}
 }
 
 // findMaxMultiple 从一个大数值中取给定数值的最大倍数
-func findMaxMultiple(bigNum, divisor int64) int64 {
+func findMaxMultiple(bigNum, divisor int) int {
 	if divisor == 0 {
 		return 0 // 防止除以0的错误
 	}
@@ -52,16 +54,16 @@ func (this *bucket) PushOrPopAll(lines ...string) []string {
 		return nil
 	}
 
-	// 取batchWriteLines最大整数倍的行数，减少实际的批量写入次数
-	popNum := findMaxMultiple(int64(total), batchWriteLines)
+	// 取单次写入量上限的最大整数倍，减少实际的批量写入次数
+	popNum := findMaxMultiple(total, this.flushSize)
 
 	all := make([]string, popNum)
-	if int(popNum) < this.size {
+	if popNum < this.size {
 		copy(all, this.lines[:popNum])
 		this.lines = append(this.lines[popNum:], lines...)
 	} else {
 		copy(all, this.lines)
-		offset := int(popNum) - len(this.lines)
+		offset := popNum - len(this.lines)
 		copy(all[len(this.lines):], lines[:offset])
 		this.lines = append(this.lines[:0], lines[offset:]...)
 	}
@@ -103,10 +105,10 @@ type bucketGroup struct {
 	buckets []*bucket
 }
 
-func newBucketGroup(db, rp string, size int) *bucketGroup {
+func newBucketGroup(db, rp string, size, flushSize int) *bucketGroup {
 	buckets := make([]*bucket, size)
 	for i := range buckets {
-		buckets[i] = newBucket(bucketSize)
+		buckets[i] = newBucket(bucketSize, flushSize)
 	}
 
 	return &bucketGroup{

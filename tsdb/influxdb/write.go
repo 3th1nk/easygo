@@ -135,7 +135,7 @@ func (this *Client) Write(db, rp string, points []*Point, immediate bool) error 
 	this.mu.Lock()
 	group, ok := this.bucketGroups[groupName]
 	if !ok {
-		group = newBucketGroup(db, rp, this.groupSize)
+		group = newBucketGroup(db, rp, this.groupSize, this.flushSize)
 		this.bucketGroups[groupName] = group
 	}
 	this.mu.Unlock()

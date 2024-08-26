@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	batchWriteLines = 4096 // InfluxDB没有硬性限制单次写入行数，官方建议单次写入5000行
+	defaultFlushSize     = 1000
+	defaultFlushInterval = 5 * time.Second
 
 	stateNotRun   = 0
 	stateRunning  = 1
@@ -30,7 +31,8 @@ type Client struct {
 	queryEpoch      string                  // 查询返回的时间格式, 默认s
 	writePrecision  string                  // 写入数据的时间精度, 默认s
 	writeSortTagKey bool                    // 写入数据时是否对tag key排序, 默认开启
-	flushInterval   time.Duration           // 异步写入数据的时间间隔, 默认1分钟
+	flushInterval   time.Duration           // 异步写入数据的时间间隔, 默认5s
+	flushSize       int                     // 异步写入数据的行数，InfluxDB没有硬性限制单次写入行数，官方建议单次写入5000行
 	debugger        *debugger               // 调试器, 默认不开启
 	writePoolSize   int                     //
 	writePool       *ants.Pool              // 写协程池
@@ -47,7 +49,8 @@ func NewClient(addr string, opts ...Option) *Client {
 		queryEpoch:      "s",
 		writePrecision:  "s",
 		writeSortTagKey: true,
-		flushInterval:   time.Minute,
+		flushInterval:   defaultFlushInterval,
+		flushSize:       defaultFlushSize,
 		writePoolSize:   30,
 		stopSignal:      make(chan struct{}, 1),
 		logger:          logs.Default,
@@ -166,8 +169,8 @@ func (this *Client) doBatchWrite(writeUrl string, lines []string) error {
 		return nil
 	}
 
-	for i := 0; i < len(lines); i += batchWriteLines {
-		end := i + batchWriteLines
+	for i := 0; i < len(lines); i += this.flushSize {
+		end := i + this.flushSize
 		if end > len(lines) {
 			end = len(lines)
 		}

@@ -64,13 +64,25 @@ func WithWriteSortTagKey(sort bool) Option {
 	}
 }
 
-// WithFlushInterval 设置异步写入数据的时间间隔, 默认1分钟，最小5秒
+// WithFlushInterval 设置异步写入数据的时间间隔
 func WithFlushInterval(interval time.Duration) Option {
 	return func(c *Client) {
-		if interval <= 5*time.Second {
-			interval = 5 * time.Second
+		if interval <= 0 {
+			interval = defaultFlushInterval
 		}
 		c.flushInterval = interval
+	}
+}
+
+// WithFlushSize 设置异步写入数据的行数上限, 最大不超过 bucketSize
+func WithFlushSize(size int) Option {
+	return func(c *Client) {
+		if size <= 0 {
+			size = defaultFlushSize
+		} else if size > bucketSize {
+			size = bucketSize
+		}
+		c.flushSize = size
 	}
 }
 
