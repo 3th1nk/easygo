@@ -146,14 +146,12 @@ func (this *Client) Write(db, rp string, points []*Point, immediate bool) error 
 	}
 	for measurement, lines := range m {
 		idx := int(crc32.ChecksumIEEE([]byte(measurement))) % group.Size()
-		if retLines := group.PushOrPopAll(idx, lines...); len(retLines) > 0 {
-
-			if err := this.writePool.Submit(func() {
-				_ = this.doBatchWrite(writeUrl, retLines)
-			}); err != nil {
-				this.logger.Warn("[InfluxDB] 获取写协程异常")
-			}
-
+		if err := group.Push(idx, lines, func(lines []string) error {
+			return this.writePool.Submit(func() {
+				_ = this.doBatchWrite(writeUrl, lines)
+			})
+		}); err != nil {
+			this.logger.Warn("[InfluxDB] 异步写入异常: %v", err)
 		}
 	}
 

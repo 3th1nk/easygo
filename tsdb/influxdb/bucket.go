@@ -40,8 +40,8 @@ func findMaxMultiple(bigNum, divisor int) int {
 	return (bigNum / divisor) * divisor
 }
 
-// PushOrPopAll 添加数据，如果满了，则返回所有数据并清空桶
-func (this *bucket) PushOrPopAll(lines ...string) []string {
+// Push 添加数据，如果满了，则触发onFull回调
+func (this *bucket) Push(lines []string, onFull func(lines []string) error) error {
 	if len(lines) == 0 {
 		return nil
 	}
@@ -69,7 +69,7 @@ func (this *bucket) PushOrPopAll(lines ...string) []string {
 	}
 	this.mu.Unlock()
 
-	return all
+	return onFull(all)
 }
 
 func (this *bucket) Len() int {
@@ -139,9 +139,9 @@ func (this *bucketGroup) Get(idx int) *bucket {
 	return this.buckets[idx]
 }
 
-func (this *bucketGroup) PushOrPopAll(idx int, lines ...string) []string {
+func (this *bucketGroup) Push(idx int, lines []string, onFull func(lines []string) error) error {
 	if bck := this.Get(idx); bck != nil {
-		return bck.PushOrPopAll(lines...)
+		return bck.Push(lines, onFull)
 	}
 	return nil
 }
