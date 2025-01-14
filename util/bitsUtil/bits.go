@@ -1,5 +1,7 @@
 package bitsUtil
 
+import "unsafe"
+
 // And returns x&y.
 func And(x, y uint) uint {
 	return x & y
@@ -20,8 +22,8 @@ func Not(x uint) uint {
 	return ^x
 }
 
-// BitClear (AND NOT) returns x&^y.
-func BitClear(x, y uint) uint {
+// AndNot returns x&^y.
+func AndNot(x, y uint) uint {
 	return x &^ y
 }
 
@@ -50,8 +52,8 @@ func IsEven(x uint) bool {
 	return (x & 1) == 0
 }
 
-// IsPowerOfTwo returns true if x is a power of two.
-func IsPowerOfTwo(x uint) bool {
+// IsPowerOf2 returns true if x is a power of 2.
+func IsPowerOf2(x uint) bool {
 	return x != 0 && (x&(x-1)) == 0
 }
 
@@ -60,9 +62,9 @@ func IsDivisibleBy8(x uint) bool {
 	return (x & 7) == 0
 }
 
-// IsOppositeSigns returns true if x and y have opposite signs.
-func IsOppositeSigns(x, y int) bool {
-	return (x ^ y) < 0
+// IsSameSign returns true if x and y have same signs.
+func IsSameSign(x, y int) bool {
+	return (x ^ y) >= 0
 }
 
 // SetNth returns x with the nth bit set to 1, and n start from 0 and rightmost.
@@ -93,4 +95,14 @@ func ToggleExceptNth(x uint, n int) uint {
 // ToggleRightN returns x with the rightmost n bits toggled.
 func ToggleRightN(x uint, n int) uint {
 	return x ^ ((1 << n) - 1)
+}
+
+// ToggleLeftN returns x with the leftmost n bits toggled.
+func ToggleLeftN(x uint, n int) uint {
+	maxBits := uint(8 * unsafe.Sizeof(x))
+	if uint(n) > maxBits {
+		n = int(maxBits)
+	}
+	mask := ^uint(0) << (maxBits - uint(n))
+	return x ^ mask
 }
