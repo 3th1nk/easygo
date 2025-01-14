@@ -3,7 +3,6 @@ package ioUtil
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -14,7 +13,7 @@ func WriteFile(filename string, data []byte, perm os.FileMode) error {
 		return err
 	}
 
-	return ioutil.WriteFile(filename, data, perm)
+	return os.WriteFile(filename, data, perm)
 }
 
 func WriteFileF(filename string, perm os.FileMode, f func(f *os.File) error) error {

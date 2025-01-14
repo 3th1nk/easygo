@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/3th1nk/easygo/util/timeUtil"
 	"github.com/modern-go/reflect2"
-	"io/ioutil"
 	"os"
 	"time"
 )
@@ -52,7 +51,7 @@ func loadFile(path string, lastMod int64, lastToken string) (int64, string, []by
 	}
 
 	// 检查文件内容有没有发生变化
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if !reflect2.IsNil(err) {
 		return lastMod, lastToken, nil, err
 	}
